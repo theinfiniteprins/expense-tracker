@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Calendar, PieChart, DollarSign, Utensils, ShoppingBag, ArrowLeft, Save } from 'lucide-react';
+import { Plus, Trash2, Calendar, PieChart, DollarSign, Utensils, ShoppingBag, ArrowLeft, Save, Pencil, Download, Upload } from 'lucide-react';
 
 export default function App() {
   const [view, setView] = useState('dashboard'); // 'dashboard' or 'add'
   const [entries, setEntries] = useState([]);
   const [filter, setFilter] = useState('7'); // '7', '30', 'custom'
+  const [editingEntry, setEditingEntry] = useState(null); // State to hold the entry being edited
   
   // New state for Date Range
   const [startDate, setStartDate] = useState('');
@@ -46,9 +47,69 @@ export default function App() {
     localStorage.setItem('expense_data', JSON.stringify(entries));
   }, [entries]);
 
-  const handleSaveEntry = (newEntry) => {
-    setEntries(prev => [newEntry, ...prev].sort((a, b) => new Date(b.date) - new Date(a.date)));
+  const handleSaveEntry = (entryToSave) => {
+    if (editingEntry) {
+      // Update existing entry
+      setEntries(prev => prev.map(item => item.id === entryToSave.id ? entryToSave : item));
+      setEditingEntry(null);
+    } else {
+      // Add new entry
+      setEntries(prev => [entryToSave, ...prev].sort((a, b) => new Date(b.date) - new Date(a.date)));
+    }
     setView('dashboard');
+  };
+
+  const handleDeleteEntry = (id) => {
+    if (window.confirm("Are you sure you want to delete this entry?")) {
+      setEntries(prev => prev.filter(entry => entry.id !== id));
+    }
+  };
+
+  const handleEditEntry = (entry) => {
+    setEditingEntry(entry);
+    setView('add');
+  };
+
+  const handleCancel = () => {
+    setEditingEntry(null);
+    setView('dashboard');
+  };
+
+  const handleExport = () => {
+    const dataStr = JSON.stringify(entries, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = "expense_tracker_backup.json";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleImport = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const importedEntries = JSON.parse(e.target.result);
+        if (Array.isArray(importedEntries)) {
+          if (window.confirm("This will replace your current data with the imported file. Are you sure?")) {
+             setEntries(importedEntries);
+             alert("Data imported successfully!");
+          }
+        } else {
+          alert("Invalid file format. Please upload a valid backup file.");
+        }
+      } catch (error) {
+        alert("Error reading file. Please ensure it is a valid backup file.");
+      }
+    };
+    reader.readAsText(file);
+    // Reset input so same file can be selected again if needed
+    event.target.value = ''; 
   };
 
   const getFilteredEntries = () => {
@@ -100,7 +161,7 @@ export default function App() {
           </h1>
           {view === 'dashboard' && (
             <button 
-              onClick={() => setView('add')}
+              onClick={() => { setEditingEntry(null); setView('add'); }}
               className="bg-white text-blue-600 p-2 rounded-full hover:bg-blue-50 transition shadow-sm"
             >
               <Plus size={20} />
@@ -120,16 +181,24 @@ export default function App() {
             setStartDate={setStartDate}
             endDate={endDate}
             setEndDate={setEndDate}
+            onDelete={handleDeleteEntry}
+            onEdit={handleEditEntry}
+            onExport={handleExport}
+            onImport={handleImport}
           />
         ) : (
-          <AddEntryForm onSave={handleSaveEntry} onCancel={() => setView('dashboard')} />
+          <AddEntryForm 
+            onSave={handleSaveEntry} 
+            onCancel={handleCancel} 
+            initialData={editingEntry}
+          />
         )}
       </div>
     </div>
   );
 }
 
-function Dashboard({ totals, filter, setFilter, entries, startDate, setStartDate, endDate, setEndDate }) {
+function Dashboard({ totals, filter, setFilter, entries, startDate, setStartDate, endDate, setEndDate, onDelete, onEdit, onExport, onImport }) {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Filters */}
@@ -199,6 +268,25 @@ function Dashboard({ totals, filter, setFilter, entries, startDate, setStartDate
           <PieChart className="text-blue-200 opacity-50" size={40} />
         </div>
       </div>
+      
+      {/* Data Management Buttons */}
+      <div className="flex gap-3 justify-end">
+        <button 
+          onClick={onExport}
+          className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 transition"
+        >
+          <Download size={16} /> Export Data
+        </button>
+        <label className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 transition cursor-pointer">
+          <Upload size={16} /> Import Data
+          <input 
+            type="file" 
+            accept=".json" // Accepts JSON files, but technically handles any text file with valid JSON content
+            className="hidden" 
+            onChange={onImport}
+          />
+        </label>
+      </div>
 
       {/* Recent History */}
       <div>
@@ -215,16 +303,34 @@ function Dashboard({ totals, filter, setFilter, entries, startDate, setStartDate
               const total = Number(entry.food) + otherSum;
               
               return (
-                <div key={entry.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center">
-                  <div>
-                    <div className="font-bold text-slate-800">{new Date(entry.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</div>
-                    <div className="text-xs text-slate-500 mt-1 flex gap-2">
-                      <span className="flex items-center gap-1"><Utensils size={10} /> ${entry.food}</span>
-                      {otherSum > 0 && <span className="flex items-center gap-1 border-l pl-2 border-slate-300"><ShoppingBag size={10} /> ${otherSum}</span>}
+                <div key={entry.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="font-bold text-slate-800">{new Date(entry.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</div>
+                      <div className="text-xs text-slate-500 mt-1 flex gap-2">
+                        <span className="flex items-center gap-1"><Utensils size={10} /> ${entry.food}</span>
+                        {otherSum > 0 && <span className="flex items-center gap-1 border-l pl-2 border-slate-300"><ShoppingBag size={10} /> ${otherSum}</span>}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="block font-bold text-blue-600 text-lg">${total}</span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <span className="block font-bold text-blue-600 text-lg">${total}</span>
+                  
+                  {/* Action Buttons */}
+                  <div className="flex justify-end gap-3 mt-3 pt-3 border-t border-slate-100">
+                    <button 
+                      onClick={() => onEdit(entry)} 
+                      className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-blue-600 transition"
+                    >
+                      <Pencil size={14} /> Edit
+                    </button>
+                    <button 
+                      onClick={() => onDelete(entry.id)} 
+                      className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-red-600 transition"
+                    >
+                      <Trash2 size={14} /> Delete
+                    </button>
                   </div>
                 </div>
               );
@@ -236,10 +342,10 @@ function Dashboard({ totals, filter, setFilter, entries, startDate, setStartDate
   );
 }
 
-function AddEntryForm({ onSave, onCancel }) {
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [food, setFood] = useState('');
-  const [others, setOthers] = useState([]); // Array of {id, detail, amount}
+function AddEntryForm({ onSave, onCancel, initialData }) {
+  const [date, setDate] = useState(initialData ? initialData.date : new Date().toISOString().split('T')[0]);
+  const [food, setFood] = useState(initialData ? initialData.food : '');
+  const [others, setOthers] = useState(initialData ? initialData.others : []); 
   const [otherDetail, setOtherDetail] = useState('');
   const [otherAmount, setOtherAmount] = useState('');
 
@@ -261,7 +367,7 @@ function AddEntryForm({ onSave, onCancel }) {
     }
 
     const entry = {
-      id: Date.now(),
+      id: initialData ? initialData.id : Date.now(), // Keep ID if editing, else generate new
       date,
       food: parseFloat(food) || 0,
       others
@@ -275,7 +381,9 @@ function AddEntryForm({ onSave, onCancel }) {
         <button onClick={onCancel} className="text-slate-500 hover:bg-slate-100 p-2 rounded-full">
           <ArrowLeft size={24} />
         </button>
-        <h2 className="text-xl font-bold text-slate-800">Add New Entry</h2>
+        <h2 className="text-xl font-bold text-slate-800">
+          {initialData ? 'Edit Entry' : 'Add New Entry'}
+        </h2>
       </div>
 
       <div className="space-y-4">
@@ -360,7 +468,7 @@ function AddEntryForm({ onSave, onCancel }) {
         onClick={handleSave}
         className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl shadow-md hover:bg-blue-700 transition flex items-center justify-center gap-2"
       >
-        <Save size={20} /> Save Entry
+        <Save size={20} /> {initialData ? 'Update Entry' : 'Save Entry'}
       </button>
     </div>
   );
