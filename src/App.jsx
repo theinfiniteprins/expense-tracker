@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Calendar, PieChart, DollarSign, Utensils, ShoppingBag, ArrowLeft, Save, Pencil, Download, Upload } from 'lucide-react';
+import { Plus, Trash2, Calendar, PieChart, IndianRupee, Utensils, ShoppingBag, ArrowLeft, Save, Pencil, Download, Upload } from 'lucide-react';
 
 export default function App() {
   const [view, setView] = useState('dashboard'); // 'dashboard' or 'add'
@@ -8,7 +8,11 @@ export default function App() {
   const [editingEntry, setEditingEntry] = useState(null); // State to hold the entry being edited
   
   // New state for Date Range
-  const [startDate, setStartDate] = useState('');
+  // Default start date is first day of current month
+  const [startDate, setStartDate] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 2).toISOString().split('T')[0];
+  });
   const [endDate, setEndDate] = useState('');
   
   // Load data from local storage on mount
@@ -157,7 +161,7 @@ export default function App() {
       <div className="bg-blue-600 text-white p-4 shadow-md sticky top-0 z-10">
         <div className="max-w-md mx-auto flex justify-between items-center">
           <h1 className="text-xl font-bold flex items-center gap-2">
-            <DollarSign size={24} /> ExpenseTracker
+            <IndianRupee size={24} /> ExpenseTracker
           </h1>
           {view === 'dashboard' && (
             <button 
@@ -249,7 +253,7 @@ function Dashboard({ totals, filter, setFilter, entries, startDate, setStartDate
             <Utensils size={20} />
           </div>
           <span className="text-xs text-slate-500 font-medium uppercase tracking-wide">Food</span>
-          <span className="text-xl font-bold text-slate-800">${totals.foodTotal.toLocaleString()}</span>
+          <span className="text-xl font-bold text-slate-800">₹{totals.foodTotal.toLocaleString()}</span>
         </div>
         
         <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
@@ -257,13 +261,13 @@ function Dashboard({ totals, filter, setFilter, entries, startDate, setStartDate
             <ShoppingBag size={20} />
           </div>
           <span className="text-xs text-slate-500 font-medium uppercase tracking-wide">Others</span>
-          <span className="text-xl font-bold text-slate-800">${totals.otherTotal.toLocaleString()}</span>
+          <span className="text-xl font-bold text-slate-800">₹{totals.otherTotal.toLocaleString()}</span>
         </div>
 
         <div className="col-span-2 bg-gradient-to-r from-blue-600 to-blue-700 p-6 rounded-xl shadow-md text-white flex justify-between items-center">
           <div>
             <p className="text-blue-100 text-sm font-medium">Total Spent</p>
-            <p className="text-3xl font-bold">${totals.grandTotal.toLocaleString()}</p>
+            <p className="text-3xl font-bold">₹{totals.grandTotal.toLocaleString()}</p>
           </div>
           <PieChart className="text-blue-200 opacity-50" size={40} />
         </div>
@@ -308,29 +312,31 @@ function Dashboard({ totals, filter, setFilter, entries, startDate, setStartDate
                     <div>
                       <div className="font-bold text-slate-800">{new Date(entry.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</div>
                       <div className="text-xs text-slate-500 mt-1 flex gap-2">
-                        <span className="flex items-center gap-1"><Utensils size={10} /> ${entry.food}</span>
-                        {otherSum > 0 && <span className="flex items-center gap-1 border-l pl-2 border-slate-300"><ShoppingBag size={10} /> ${otherSum}</span>}
+                        <span className="flex items-center gap-1"><Utensils size={10} /> ₹{entry.food}</span>
+                        {otherSum > 0 && <span className="flex items-center gap-1 border-l pl-2 border-slate-300"><ShoppingBag size={10} /> ₹{otherSum}</span>}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className="block font-bold text-blue-600 text-lg">${total}</span>
+                    
+                    {/* Total Amount & Action Buttons grouped here */}
+                    <div className="flex flex-col items-end gap-2">
+                      <span className="block font-bold text-blue-600 text-lg">₹{total}</span>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => onEdit(entry)} 
+                          className="p-1.5 bg-slate-100 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition"
+                          title="Edit"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button 
+                          onClick={() => onDelete(entry.id)} 
+                          className="p-1.5 bg-slate-100 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-full transition"
+                          title="Delete"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  
-                  {/* Action Buttons */}
-                  <div className="flex justify-end gap-3 mt-3 pt-3 border-t border-slate-100">
-                    <button 
-                      onClick={() => onEdit(entry)} 
-                      className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-blue-600 transition"
-                    >
-                      <Pencil size={14} /> Edit
-                    </button>
-                    <button 
-                      onClick={() => onDelete(entry.id)} 
-                      className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-red-600 transition"
-                    >
-                      <Trash2 size={14} /> Delete
-                    </button>
                   </div>
                 </div>
               );
@@ -404,7 +410,7 @@ function AddEntryForm({ onSave, onCancel, initialData }) {
             <Utensils size={16} className="text-orange-500" /> Food Expense
           </label>
           <div className="relative">
-            <span className="absolute left-3 top-3 text-slate-400">$</span>
+            <span className="absolute left-3 top-3 text-slate-400">₹</span>
             <input 
               type="number" 
               placeholder="0.00"
@@ -428,7 +434,7 @@ function AddEntryForm({ onSave, onCancel, initialData }) {
                 <div key={item.id} className="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100 text-sm">
                   <span className="font-medium text-slate-700">{item.detail}</span>
                   <div className="flex items-center gap-3">
-                    <span className="font-bold text-slate-900">${item.amount}</span>
+                    <span className="font-bold text-slate-900">₹{item.amount}</span>
                     <button onClick={() => removeOtherItem(item.id)} className="text-red-400 hover:text-red-600">
                       <Trash2 size={16} />
                     </button>
