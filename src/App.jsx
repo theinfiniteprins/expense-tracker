@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Calendar, PieChart, IndianRupee, Utensils, ShoppingBag, ArrowLeft, Save, Pencil, Download, Upload } from 'lucide-react';
+import { Plus, Trash2, Calendar, PieChart, IndianRupee, Utensils, ShoppingBag, ArrowLeft, Save, Pencil, Copy, Upload } from 'lucide-react';
 
 export default function App() {
   const [view, setView] = useState('dashboard'); // 'dashboard' or 'add'
@@ -8,7 +8,7 @@ export default function App() {
   const [editingEntry, setEditingEntry] = useState(null); // State to hold the entry being edited
   
   // New state for Date Range
-  // Default start date is first day of current month
+  // Default start date is first day of current month (preserved from your input)
   const [startDate, setStartDate] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 2).toISOString().split('T')[0];
@@ -79,16 +79,34 @@ export default function App() {
     setView('dashboard');
   };
 
-  const handleExport = () => {
+  const handleCopyData = () => {
     const dataStr = JSON.stringify(entries, null, 2);
-    const blob = new Blob([dataStr], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = "expense_tracker_backup.json";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    
+    // Create a temporary text area to copy from (robust method for mobile/webviews)
+    const textArea = document.createElement("textarea");
+    textArea.value = dataStr;
+    
+    // Ensure it's not visible but part of the DOM
+    textArea.style.position = "fixed";
+    textArea.style.left = "-9999px";
+    textArea.style.top = "0";
+    document.body.appendChild(textArea);
+    
+    textArea.focus();
+    textArea.select();
+    
+    try {
+      const successful = document.execCommand('copy');
+      if (successful) {
+        alert("Data copied to clipboard! You can paste it into a note or file to save it.");
+      } else {
+        alert("Unable to copy data automatically. Please try again.");
+      }
+    } catch (err) {
+      alert("Failed to copy data.");
+    }
+    
+    document.body.removeChild(textArea);
   };
 
   const handleImport = (event) => {
@@ -187,7 +205,7 @@ export default function App() {
             setEndDate={setEndDate}
             onDelete={handleDeleteEntry}
             onEdit={handleEditEntry}
-            onExport={handleExport}
+            onCopy={handleCopyData}
             onImport={handleImport}
           />
         ) : (
@@ -202,7 +220,7 @@ export default function App() {
   );
 }
 
-function Dashboard({ totals, filter, setFilter, entries, startDate, setStartDate, endDate, setEndDate, onDelete, onEdit, onExport, onImport }) {
+function Dashboard({ totals, filter, setFilter, entries, startDate, setStartDate, endDate, setEndDate, onDelete, onEdit, onCopy, onImport }) {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Filters */}
@@ -276,10 +294,10 @@ function Dashboard({ totals, filter, setFilter, entries, startDate, setStartDate
       {/* Data Management Buttons */}
       <div className="flex gap-3 justify-end">
         <button 
-          onClick={onExport}
+          onClick={onCopy}
           className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 transition"
         >
-          <Download size={16} /> Export Data
+          <Copy size={16} /> Copy Data
         </button>
         <label className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 transition cursor-pointer">
           <Upload size={16} /> Import Data
@@ -479,3 +497,5 @@ function AddEntryForm({ onSave, onCancel, initialData }) {
     </div>
   );
 }
+
+
