@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Calendar, PieChart, IndianRupee, Utensils, ShoppingBag, ArrowLeft, Save, Pencil, Download, Upload } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Trash2, Calendar, PieChart, IndianRupee, Utensils, ShoppingBag, ArrowLeft, Save, Pencil, Copy, Upload, X } from 'lucide-react';
 
 export default function App() {
   const [view, setView] = useState('dashboard'); // 'dashboard' or 'add'
@@ -8,10 +8,10 @@ export default function App() {
   const [editingEntry, setEditingEntry] = useState(null); // State to hold the entry being edited
   
   // New state for Date Range
-  // Default start date is first day of current month
+  // Default start date is first day of current month (preserved from your input)
   const [startDate, setStartDate] = useState(() => {
     const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 2).toISOString().split('T')[0];
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
   });
   const [endDate, setEndDate] = useState('');
   
@@ -40,7 +40,9 @@ export default function App() {
           id: Date.now() - 1000,
           date: yesterday.toISOString().split('T')[0],
           food: 300,
-          others: []
+          others: [
+            { id: 3, detail: 'Uber to work', amount: 100 }
+          ]
         }
       ]);
     }
@@ -79,16 +81,34 @@ export default function App() {
     setView('dashboard');
   };
 
-  const handleExport = () => {
+  const handleCopyData = () => {
     const dataStr = JSON.stringify(entries, null, 2);
-    const blob = new Blob([dataStr], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = "expense_tracker_backup.json";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    
+    // Create a temporary text area to copy from (robust method for mobile/webviews)
+    const textArea = document.createElement("textarea");
+    textArea.value = dataStr;
+    
+    // Ensure it's not visible but part of the DOM
+    textArea.style.position = "fixed";
+    textArea.style.left = "-9999px";
+    textArea.style.top = "0";
+    document.body.appendChild(textArea);
+    
+    textArea.focus();
+    textArea.select();
+    
+    try {
+      const successful = document.execCommand('copy');
+      if (successful) {
+        alert("Data copied to clipboard! You can paste it into a note or file to save it.");
+      } else {
+        alert("Unable to copy data automatically. Please try again.");
+      }
+    } catch (err) {
+      alert("Failed to copy data.");
+    }
+    
+    document.body.removeChild(textArea);
   };
 
   const handleImport = (event) => {
@@ -187,7 +207,7 @@ export default function App() {
             setEndDate={setEndDate}
             onDelete={handleDeleteEntry}
             onEdit={handleEditEntry}
-            onExport={handleExport}
+            onCopy={handleCopyData}
             onImport={handleImport}
           />
         ) : (
@@ -202,9 +222,32 @@ export default function App() {
   );
 }
 
-function Dashboard({ totals, filter, setFilter, entries, startDate, setStartDate, endDate, setEndDate, onDelete, onEdit, onExport, onImport }) {
+function Dashboard({ totals, filter, setFilter, entries, startDate, setStartDate, endDate, setEndDate, onDelete, onEdit, onCopy, onImport }) {
+  const [showBreakdown, setShowBreakdown] = useState(false);
+
+  // Calculate aggregated breakdown for "Others"
+  const othersBreakdown = useMemo(() => {
+    const map = {};
+    entries.forEach(entry => {
+      if (entry.others && entry.others.length > 0) {
+        entry.others.forEach(item => {
+          const detail = item.detail.trim();
+          // Use lowercase key to group case-insensitively, but keep original display name
+          const key = detail.toLowerCase();
+          
+          if (!map[key]) {
+            map[key] = { name: detail, total: 0 };
+          }
+          map[key].total += Number(item.amount);
+        });
+      }
+    });
+    // Convert to array and sort by total descending
+    return Object.values(map).sort((a, b) => b.total - a.total);
+  }, [entries]);
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in relative">
       {/* Filters */}
       <div className="flex bg-white p-1 rounded-lg shadow-sm border border-slate-200">
         {['7', '30', 'custom'].map((f) => (
@@ -256,7 +299,11 @@ function Dashboard({ totals, filter, setFilter, entries, startDate, setStartDate
           <span className="text-xl font-bold text-slate-800">₹{totals.foodTotal.toLocaleString()}</span>
         </div>
         
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
+        {/* Clickable Others Card */}
+        <div 
+          onClick={() => setShowBreakdown(true)}
+          className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-50 transition active:scale-95"
+        >
           <div className="bg-purple-100 p-2 rounded-full mb-2 text-purple-600">
             <ShoppingBag size={20} />
           </div>
@@ -273,13 +320,54 @@ function Dashboard({ totals, filter, setFilter, entries, startDate, setStartDate
         </div>
       </div>
       
+      {/* Breakdown Modal */}
+      {showBreakdown && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in backdrop-blur-sm">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <ShoppingBag size={18} className="text-purple-600" />
+                Others Breakdown
+              </h3>
+              <button 
+                onClick={(e) => { e.stopPropagation(); setShowBreakdown(false); }}
+                className="p-1 rounded-full hover:bg-slate-200 text-slate-500 transition"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="overflow-y-auto p-4 flex-1">
+              {othersBreakdown.length === 0 ? (
+                <div className="text-center py-8 text-slate-400">
+                  <p>No other expenses found.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {othersBreakdown.map((item, index) => (
+                    <div key={index} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <span className="font-medium text-slate-700">{item.name}</span>
+                      <span className="font-bold text-slate-900">₹{item.total.toLocaleString()}</span>
+                    </div>
+                  ))}
+                  <div className="pt-3 border-t border-slate-100 flex justify-between items-center mt-2">
+                    <span className="text-sm text-slate-500 font-medium">Total</span>
+                    <span className="font-bold text-purple-600 text-lg">₹{totals.otherTotal.toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Data Management Buttons */}
       <div className="flex gap-3 justify-end">
         <button 
-          onClick={onExport}
+          onClick={onCopy}
           className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 transition"
         >
-          <Download size={16} /> Export Data
+          <Copy size={16} /> Copy Data
         </button>
         <label className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 transition cursor-pointer">
           <Upload size={16} /> Import Data
