@@ -9,7 +9,6 @@ export default function App() {
   
   // New state for Date Range
   // Default start date is first day of current month (preserved from your input)
-  // Default start date is first day of current month (preserved from your input)
   const [startDate, setStartDate] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
@@ -83,34 +82,7 @@ export default function App() {
   };
 
   const handleCopyData = () => {
-  const handleCopyData = () => {
     const dataStr = JSON.stringify(entries, null, 2);
-    
-    // Create a temporary text area to copy from (robust method for mobile/webviews)
-    const textArea = document.createElement("textarea");
-    textArea.value = dataStr;
-    
-    // Ensure it's not visible but part of the DOM
-    textArea.style.position = "fixed";
-    textArea.style.left = "-9999px";
-    textArea.style.top = "0";
-    document.body.appendChild(textArea);
-    
-    textArea.focus();
-    textArea.select();
-    
-    try {
-      const successful = document.execCommand('copy');
-      if (successful) {
-        alert("Data copied to clipboard! You can paste it into a note or file to save it.");
-      } else {
-        alert("Unable to copy data automatically. Please try again.");
-      }
-    } catch (err) {
-      alert("Failed to copy data.");
-    }
-    
-    document.body.removeChild(textArea);
     
     // Create a temporary text area to copy from (robust method for mobile/webviews)
     const textArea = document.createElement("textarea");
@@ -235,7 +207,6 @@ export default function App() {
             setEndDate={setEndDate}
             onDelete={handleDeleteEntry}
             onEdit={handleEditEntry}
-            onCopy={handleCopyData}
             onCopy={handleCopyData}
             onImport={handleImport}
           />
@@ -394,10 +365,8 @@ function Dashboard({ totals, filter, setFilter, entries, startDate, setStartDate
       <div className="flex gap-3 justify-end">
         <button 
           onClick={onCopy}
-          onClick={onCopy}
           className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 transition"
         >
-          <Copy size={16} /> Copy Data
           <Copy size={16} /> Copy Data
         </button>
         <label className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 transition cursor-pointer">
@@ -598,5 +567,3 @@ function AddEntryForm({ onSave, onCancel, initialData }) {
     </div>
   );
 }
-
-
