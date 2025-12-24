@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Plus, Trash2, Calendar as CalendarIcon, PieChart as PieChartIcon, 
   IndianRupee, Utensils, ShoppingBag, ArrowLeft, Save, Pencil, 
@@ -84,16 +84,17 @@ export default function App() {
     setView('dashboard');
   };
 
-  const handleDeleteEntry = (id) => {
+  // Optimized Handlers with useCallback
+  const handleDeleteEntry = useCallback((id) => {
     if (window.confirm("Are you sure you want to delete this entry?")) {
       setEntries(prev => prev.filter(entry => entry.id !== id));
     }
-  };
+  }, []);
 
-  const handleEditEntry = (entry) => {
+  const handleEditEntry = useCallback((entry) => {
     setEditingEntry(entry);
     setView('add');
-  };
+  }, []);
 
   const handleCancel = () => {
     setEditingEntry(null);
@@ -525,7 +526,8 @@ function Dashboard({ totals, filter, setFilter, entries, startDate, setStartDate
 
 // --- List View Components ---
 
-function SwipeableEntry({ entry, onEdit, onDelete }) {
+// OPTIMIZED: Memoized to prevent unnecessary re-renders when other UI elements update
+const SwipeableEntry = React.memo(({ entry, onEdit, onDelete }) => {
   const otherSum = entry.others.reduce((acc, curr) => acc + Number(curr.amount), 0);
   const total = Number(entry.food) + otherSum;
   
@@ -560,8 +562,12 @@ function SwipeableEntry({ entry, onEdit, onDelete }) {
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={0.7}
         onDragEnd={handleDragEnd}
-        className="relative bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-white/50 cursor-grab active:cursor-grabbing z-10"
+        // PERFORMANCE FIX: Removed backdrop-blur-sm from list items. 
+        // Having blur on many scrollable items is the #1 cause of lag on mobile/web.
+        className="relative bg-white/80 shadow-sm border border-white/50 p-4 rounded-2xl cursor-grab active:cursor-grabbing z-10"
         whileTap={{ scale: 0.98 }}
+        // Performance hint for browser
+        layout
       >
         <div className="flex justify-between items-start pointer-events-none">
           <div>
@@ -588,7 +594,7 @@ function SwipeableEntry({ entry, onEdit, onDelete }) {
       </motion.div>
     </div>
   );
-}
+});
 
 // --- Calendar Component ---
 
@@ -606,9 +612,11 @@ function CalendarView({ entries, onDateSelect }) {
   const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
   const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
 
+  // PERFORMANCE FIX: Use a Set for O(1) lookup instead of iterating array for every day cell
+  const entryDates = useMemo(() => new Set(entries.map(e => e.date)), [entries]);
   const hasEntry = (day) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return entries.some(e => e.date === dateStr);
+    return entryDates.has(dateStr);
   };
 
   const renderDays = () => {
